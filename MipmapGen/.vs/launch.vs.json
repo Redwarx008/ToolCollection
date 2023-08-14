@@ -9,7 +9,7 @@
       "name": "MipmapGen.exe",
       "args": [
         "heightmap.png",
-        1
+        2
       ]
     }
   ]
