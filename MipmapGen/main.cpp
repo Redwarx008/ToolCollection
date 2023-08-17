@@ -7,7 +7,7 @@
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include "stb_image_write.h"
 
- stbi_inline static uint16_t get_pixel(void* pixels, int bitDepth, 
+ stbi_inline static uint16_t get_channel_value(void* pixels, int bitDepth, 
     int x, int y, int width, int height, int nChannel, int channel)
 {
     if (x >= width) x = width - 1;
@@ -32,7 +32,7 @@
     return value;
 }
 
- stbi_inline static void set_pixel(void* pixels, uint16_t value, int bitDepth,
+ stbi_inline static void set_channel_value(void* pixels, uint16_t value, int bitDepth,
     int x, int y, int width, int nChannel, int channel)
 {
     if (bitDepth == 16)
@@ -57,6 +57,31 @@
      return fileName.substr(0, fileName.find_last_of('.'));
  }
 
+ static void WriteToFile(const std::string& fileName, void* pixels, int bitDepth, 
+     int nChannel, int height, int width)
+ {
+     FILE* f;
+#if defined(_MSC_VER) && _MSC_VER >= 1400
+     if (0 != fopen_s(&f, fileName.c_str(), "ab+"))
+     {
+         return;
+     }
+#else 
+     f = fopen(fileName, "ab+");
+     if (f == nullptr)
+     {
+         return;
+     }
+#endif // (_MSC_VER) && _MSC_VER >= 1400
+
+     uint8_t pixelInfo[] = {(uint8_t)bitDepth, (uint8_t)nChannel};
+     uint16_t sizeInfo[] = { (uint16_t)width, (uint16_t)height };
+     fwrite(&pixelInfo[0], sizeof(uint8_t), sizeof(pixelInfo) / sizeof(uint8_t), f);
+     fwrite(&sizeInfo[0], sizeof(uint16_t), sizeof(sizeInfo) / sizeof(uint16_t), f);
+     fwrite(pixels, bitDepth / 8, static_cast<size_t>(width) * height * nChannel, f);
+     fclose(f);
+ }
+
 int main(int argc, char* argv[])
 {
     if (argc != 3)
@@ -73,7 +98,7 @@ int main(int argc, char* argv[])
     if (ok == 0)
     {
         std::cout << stbi_failure_reason() << std::endl;
-        return 0;
+        return 3;
     }
 
     bool is16Bit = stbi_is_16_bit(fileName.c_str()) == 1 ? true : false;
@@ -92,7 +117,7 @@ int main(int argc, char* argv[])
     if (maxMipLevel < 1 || maxMipLevel > std::max(1, (int)std::log2(std::min(width, height))))
     {
         std::cout << "mip level is out of range.\n";
-        return 0;
+        return 2;
     }
 
     void* inPixels = originPixels;
@@ -105,7 +130,7 @@ int main(int argc, char* argv[])
         if (outPixels == nullptr)
         {
             std::cout << "There is not enough available memory.\n";
-            return 0;
+            return 12;
         }
 
         for (int y = 0; y < h; ++y)
@@ -140,22 +165,23 @@ int main(int argc, char* argv[])
 
                 for (int c = 0; c < nChannel; ++c)
                 {
-                    float y0 = wx0 * get_pixel(inPixels, bitDepth, 2 * x, 2 * y, width, height, nChannel, c) +
-                        wx1 * get_pixel(inPixels, bitDepth, 2 * x + 1, 2 * y, width, height, nChannel, c) +
-                        wx2 * get_pixel(inPixels, bitDepth, 2 * x + 2, 2 * y, width, height, nChannel, c);
-                    float y1 = wx0 * get_pixel(inPixels, bitDepth, 2 * x, 2 * y + 1, width, height, nChannel, c) +
-                        wx1 * get_pixel(inPixels, bitDepth, 2 * x + 1, 2 * y + 1, width, height, nChannel, c) +
-                        wx2 * get_pixel(inPixels, bitDepth, 2 * x + 2, 2 * y + 1, width, height, nChannel, c);
-                    float y2 = wx0 * get_pixel(inPixels, bitDepth, 2 * x, 2 * y + 2, width, height, nChannel, c) +
-                        wx1 * get_pixel(inPixels, bitDepth, 2 * x + 1, 2 * y + 2, width, height, nChannel, c) +
-                        wx2 * get_pixel(inPixels, bitDepth, 2 * x + 2, 2 * y + 2, width, height, nChannel, c);
+                    float y0 = wx0 * get_channel_value(inPixels, bitDepth, 2 * x, 2 * y, width, height, nChannel, c) +
+                        wx1 * get_channel_value(inPixels, bitDepth, 2 * x + 1, 2 * y, width, height, nChannel, c) +
+                        wx2 * get_channel_value(inPixels, bitDepth, 2 * x + 2, 2 * y, width, height, nChannel, c);
+                    float y1 = wx0 * get_channel_value(inPixels, bitDepth, 2 * x, 2 * y + 1, width, height, nChannel, c) +
+                        wx1 * get_channel_value(inPixels, bitDepth, 2 * x + 1, 2 * y + 1, width, height, nChannel, c) +
+                        wx2 * get_channel_value(inPixels, bitDepth, 2 * x + 2, 2 * y + 1, width, height, nChannel, c);
+                    float y2 = wx0 * get_channel_value(inPixels, bitDepth, 2 * x, 2 * y + 2, width, height, nChannel, c) +
+                        wx1 * get_channel_value(inPixels, bitDepth, 2 * x + 1, 2 * y + 2, width, height, nChannel, c) +
+                        wx2 * get_channel_value(inPixels, bitDepth, 2 * x + 2, 2 * y + 2, width, height, nChannel, c);
 
                     float mixValue = wy0 * y0 + wy1 * y1 + wy2 * y2;
-                    set_pixel(outPixels, mixValue, bitDepth, x, y, w, nChannel, c);
+                    set_channel_value(outPixels, mixValue, bitDepth, x, y, w, nChannel, c);
                 }
             }
         }
-        stbi_write_png((GetFileNameWithoutSuffix(fileName) + '_' + std::to_string(mip) + ".png").c_str(), w, h, nChannel, outPixels, w);
+        /*stbi_write_png((GetFileNameWithoutSuffix(fileName) + '_' + std::to_string(mip) + ".png").c_str(), w, h, nChannel, outPixels, w);*/
+        WriteToFile(GetFileNameWithoutSuffix(fileName).c_str(), outPixels, bitDepth, nChannel, h, w);
         stbi_image_free(inPixels);
         inPixels = outPixels;
         width = w;
@@ -163,5 +189,6 @@ int main(int argc, char* argv[])
     }
     // free the last mip data.
     stbi_image_free(inPixels);
+    return 0;
 }
 
