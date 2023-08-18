@@ -1,8 +1,4 @@
-/MipmapGen/.vs/MipmapGen/
-/MipmapGen/build/
-/MipmapGen/.vs/slnx.sqlite
-/MipmapGen/.vs/CMake Overview
-.vs/VSWorkspaceState.json
-out/
-/MipmapGen/.vs/VSWorkspaceState.json
-/MipmapGen/.vs/cmake.db
+**/build
+**/.vs/
+
+

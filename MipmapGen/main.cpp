@@ -1,6 +1,7 @@
 #include <iostream>
 #include <vector>
 #include <string>
+#include <filesystem>
 #define STB_IMAGE_IMPLEMENTATION
 //#define STBI_ASSERT(x)
 #include "stb_image.h"
@@ -67,7 +68,7 @@
          return;
      }
 #else 
-     f = fopen(fileName, "ab+");
+     f = fopen(fileName.c_str(), "ab+");
      if (f == nullptr)
      {
          return;
@@ -87,6 +88,7 @@ int main(int argc, char* argv[])
     if (argc != 3)
     {
         std::cout << "usage: [file] [max mip level].\n";
+        return 22;
     }
     
     int maxMipLevel = atoi(argv[2]);
@@ -120,6 +122,12 @@ int main(int argc, char* argv[])
         return 2;
     }
 
+    std::string outputFileName = GetFileNameWithoutSuffix(fileName);
+    if (std::filesystem::exists(outputFileName))
+    {
+        std::filesystem::remove(outputFileName);
+    }
+    
     void* inPixels = originPixels;
     for (int mip = 1; mip <= maxMipLevel; ++mip)
     {
@@ -181,7 +189,7 @@ int main(int argc, char* argv[])
             }
         }
         /*stbi_write_png((GetFileNameWithoutSuffix(fileName) + '_' + std::to_string(mip) + ".png").c_str(), w, h, nChannel, outPixels, w);*/
-        WriteToFile(GetFileNameWithoutSuffix(fileName).c_str(), outPixels, bitDepth, nChannel, h, w);
+        WriteToFile(outputFileName, outPixels, bitDepth, nChannel, h, w);
         stbi_image_free(inPixels);
         inPixels = outPixels;
         width = w;
