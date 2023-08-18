@@ -58,7 +58,7 @@
      return fileName.substr(0, fileName.find_last_of('.'));
  }
 
- static void WriteToFile(const std::string& fileName, void* pixels, int bitDepth, 
+ static void WriteAsTextureData(const std::string& fileName, void* pixels, int bitDepth, 
      int nChannel, int height, int width)
  {
      FILE* f;
@@ -79,8 +79,31 @@
      uint16_t sizeInfo[] = { (uint16_t)width, (uint16_t)height };
      fwrite(&pixelInfo[0], sizeof(uint8_t), sizeof(pixelInfo) / sizeof(uint8_t), f);
      fwrite(&sizeInfo[0], sizeof(uint16_t), sizeof(sizeInfo) / sizeof(uint16_t), f);
-     fwrite(pixels, bitDepth / 8, static_cast<size_t>(width) * height * nChannel, f);
-     fclose(f);
+
+     if (bitDepth == 16)
+     {
+         uint16_t* originData = static_cast<uint16_t*>(pixels);
+         float* data = new float[static_cast<size_t>(width) * height * nChannel];
+         for (int y = 0; y < height; ++y)
+         {
+             for (int x = 0; x < width; ++x)
+             {
+                 for (int c = 0; c < nChannel; ++c)
+                 {
+                     uint32_t index = (x + static_cast<size_t>(width) * y) * nChannel + c;
+                     data[index] = originData[index];
+                 }
+             }
+         }
+         fwrite(data, sizeof(float), static_cast<size_t>(width) * height * nChannel, f);
+         fclose(f);
+         delete[] data;
+     }
+     else
+     {
+         fwrite(pixels, bitDepth / 8, static_cast<size_t>(width) * height * nChannel, f);
+         fclose(f);
+     }
  }
 
 int main(int argc, char* argv[])
@@ -189,7 +212,7 @@ int main(int argc, char* argv[])
             }
         }
         /*stbi_write_png((GetFileNameWithoutSuffix(fileName) + '_' + std::to_string(mip) + ".png").c_str(), w, h, nChannel, outPixels, w);*/
-        WriteToFile(outputFileName, outPixels, bitDepth, nChannel, h, w);
+        WriteAsTextureData(outputFileName, outPixels, bitDepth, nChannel, h, w);
         stbi_image_free(inPixels);
         inPixels = outPixels;
         width = w;
