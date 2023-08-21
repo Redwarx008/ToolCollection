@@ -8,6 +8,8 @@
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include "stb_image_write.h"
 
+const float heightMultiplier = 100;
+
  stbi_inline static uint16_t get_channel_value(void* pixels, int bitDepth, 
     int x, int y, int width, int height, int nChannel, int channel)
 {
@@ -82,28 +84,31 @@
 
      if (bitDepth == 16)
      {
-         uint16_t* originData = static_cast<uint16_t*>(pixels);
-         float* data = new float[static_cast<size_t>(width) * height * nChannel];
+         uint16_t* data = static_cast<uint16_t*>(pixels);
          for (int y = 0; y < height; ++y)
          {
              for (int x = 0; x < width; ++x)
              {
                  for (int c = 0; c < nChannel; ++c)
                  {
-                     uint32_t index = (x + static_cast<size_t>(width) * y) * nChannel + c;
-                     data[index] = originData[index];
+                     uint32_t offset = (x + static_cast<size_t>(width) * y) * nChannel + c;
+                     fwrite(&data[offset], sizeof(float), 1, f);
                  }
              }
          }
-         fwrite(data, sizeof(float), static_cast<size_t>(width) * height * nChannel, f);
          fclose(f);
-         delete[] data;
      }
      else
      {
          fwrite(pixels, bitDepth / 8, static_cast<size_t>(width) * height * nChannel, f);
          fclose(f);
      }
+ }
+
+ static void WriteTiles(const std::string& fileName, void* pixels, int bitDepth,
+     int nChannel, int height, int width, int tileSize)
+ {
+
  }
 
 int main(int argc, char* argv[])
