@@ -105,11 +105,6 @@ const float heightMultiplier = 100;
      }
  }
 
- static void WriteTiles(const std::string& fileName, void* pixels, int bitDepth,
-     int nChannel, int height, int width, int tileSize)
- {
-
- }
 
 int main(int argc, char* argv[])
 {

@@ -14,6 +14,7 @@ enum TiledTextureFormat : uint8_t
 class Tile
 {
 public:
+	Tile() { _data = nullptr; }
 	Tile(uint8_t* data) { _data = data; }
 	~Tile() { delete _data; }
 private:

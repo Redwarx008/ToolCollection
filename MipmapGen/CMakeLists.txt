@@ -12,7 +12,7 @@ project(MipmapGen LANGUAGES CXX)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 
-add_executable(MipmapGen main.cpp "TiledTexture.cpp")
+add_executable(MipmapGen main.cpp "TiledTexture.cpp" "utility.h")
 
 target_compile_features(MipmapGen PUBLIC cxx_std_17)
 
