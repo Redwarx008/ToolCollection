@@ -1,6 +1,3 @@
-#include <iostream>
-#include <vector>
-#include <string>
 #include <filesystem>
 
 #include "inicpp.h"
@@ -127,7 +124,7 @@ int main(int argc, char* argv[])
 
         if (Settings::ExportPng && bitDepth == 8)
         {
-            stbi_write_png((outputFileName + '_' + std::to_string(mip) + ".png").c_str(), w, h, nChannel, outPixels, w);
+            stbi_write_png((outputFileName + '_' + std::to_string(mip) + ".png").c_str(), w, h, nChannel, outPixels, w * nChannel);
         }
         else
         {

@@ -1,12 +1,18 @@
 #include <cstdint>
 #include <cmath>
 #include <string>
+#include <iostream>
 
 #define STB_IMAGE_IMPLEMENTATION
 //#define STBI_ASSERT(x)
 #include "stb_image.h"
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include "stb_image_write.h"
+
+struct Vector3;
+FILE* OpenFile(const std::string& fileName, const char* mode);
+void ExportHeightmap16(FILE* f, uint16_t* source, int width, int height);
+uint8_t* GenerateNormalmap8(float* heightmap, int width, int height);
 
 struct Vector3
 {
@@ -47,7 +53,14 @@ struct Settings
     static bool GenerateNormalMap;
 
     static bool ExportPng;
+
 };
+
+std::string Settings::FileName;
+int Settings::MaxMipLevel;
+float Settings::HeightMultiplier;
+bool Settings::GenerateNormalMap;
+bool Settings::ExportPng;
 
 stbi_inline uint16_t get_channel_value(void* pixels, int bitDepth,
     int x, int y, int width, int height, int nChannel, int channel)
@@ -100,22 +113,28 @@ stbi_inline std::string GetFileNameWithoutSuffix(const std::string& fileName)
     return fileName.substr(0, fileName.find_last_of('.'));
 }
 
-void WriteTexture(const std::string& fileName, void* pixels, int bitDepth,
-    int nChannel, int height, int width)
+FILE* OpenFile(const std::string& fileName, const char* mode)
 {
     FILE* f;
 #if defined(_MSC_VER) && _MSC_VER >= 1400
-    if (0 != fopen_s(&f, fileName.c_str(), "ab+"))
+    if (0 != fopen_s(&f, fileName.c_str(), mode))
     {
-        return;
+        return nullptr;
     }
 #else 
-    f = fopen(fileName.c_str(), "ab+");
+    f = fopen(fileName.c_str(), mode);
     if (f == nullptr)
     {
-        return;
+        return nullptr;
     }
 #endif // (_MSC_VER) && _MSC_VER >= 1400
+    return f;
+}
+
+void WriteTexture(const std::string& fileName, void* pixels, int bitDepth,
+    int nChannel, int height, int width)
+{
+    FILE* f = OpenFile(fileName, "ab+");
 
     uint8_t pixelInfo[] = { (uint8_t)bitDepth, (uint8_t)nChannel };
     uint16_t sizeInfo[] = { (uint16_t)width, (uint16_t)height };
@@ -125,50 +144,72 @@ void WriteTexture(const std::string& fileName, void* pixels, int bitDepth,
     if (bitDepth == 16)
     {
         uint16_t* data = static_cast<uint16_t*>(pixels);
+        if (nChannel != 1)
+        {
+            std::cout << "16 bit deep images only support single channel grayscale images.\n";
+            fclose(f);
+            return;
+        }
         // for heightmap
-        if (nChannel == 1)
-        {
-            ExportHeightmap(f, data, width, height);
-        }
-        else
-        {
-            for (int y = 0; y < height; ++y)
-            {
-                for (int x = 0; x < width; ++x)
-                {
-                    for (int c = 0; c < nChannel; ++c)
-                    {
-                        uint32_t offset = (x + static_cast<size_t>(width) * y) * nChannel + c;
-                        fwrite(&data[offset], sizeof(float), 1, f);
-                    }
-                }
-            }
-        }
-
-        fclose(f);
+        ExportHeightmap16(f, data, width, height);
     }
     else
     {
-        fwrite(pixels, bitDepth / 8, static_cast<size_t>(width) * height * nChannel, f);
-        fclose(f);
+        fwrite(pixels, bitDepth / 8, width * height * nChannel, f);
     }
+    fclose(f);
 }
 
-void ExportHeightmap(FILE* f, uint16_t* source, int width, int height)
+int mip = 1;
+void ExportHeightmap16(FILE* f, uint16_t* source, int width, int height)
 {
+    int size = width * height;
+    float* heightmap = new float[size];
+    if (heightmap == nullptr)
+    {
+        std::cout << "There is not enough available memory to export heightmap.\n";
+        return;
+    }
+    for (int i = 0; i < size; ++i)
+    {
+        heightmap[i] = source[i] / 65535.0 * Settings::HeightMultiplier;
+    }
+    fwrite(heightmap, sizeof(float), size, f);
     
+    if (Settings::GenerateNormalMap)
+    {
+        uint8_t* normalmap = GenerateNormalmap8(heightmap, width, height);
+        if (normalmap != nullptr)
+        {
+            std::string fileName = GetFileNameWithoutSuffix(Settings::FileName) + "_normal";
+            FILE* normalF = OpenFile(fileName, "ab+");
+            fwrite(normalmap, sizeof(uint8_t), static_cast<size_t>(width) * height * 2, normalF);
+            if (Settings::ExportPng)
+            {
+                stbi_write_png((fileName + std::to_string(mip) + ".png").c_str(), width, height, 2, normalmap, 2 * width);
+            }
+            fclose(normalF);
+            delete[] normalmap;
+        }
+    }
+    delete[] heightmap;
+    ++mip;
 }
 
-uint8_t* GenerateNormalmap(float* heightmap, int width, int height)
+uint8_t* GenerateNormalmap8(float* heightmap, int width, int height)
 {
 	if (!heightmap)
 	{
 		return nullptr;
 	}
 
-	uint32_t resolution = width * height;
-    uint8_t* normalmap = new uint8_t[resolution * 2]; //R16G16 texture
-
+    int resolution = width * height;
+    uint8_t* normalmap = new uint8_t[resolution * 2]; //r8g8 texture
+    if (normalmap == nullptr)
+    {
+        std::cout << "There is not enough available memory to export normalmap.\n";
+        return nullptr;
+    }
 	for (int index = 0; index < resolution; ++index)
 	{
         int upIndex = index - width < 0 ? index : index - width;
